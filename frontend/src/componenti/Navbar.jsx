@@ -1,66 +1,36 @@
-import {Link, useNavigate} from "react-router-dom";
-import { Contesto } from "../contesto/AuthContext.jsx"
-import React from "react";
-import axios from "axios";
-import './Navbar.css'
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contesto/AuthContext.jsx";
+import './Navbar.css';
 
 export default function Navbar() {
+    const { token, isAdmin, elimina_contesto } = useAuth();
+    const navigate = useNavigate();
 
-    const { token, elimina_contesto }= React.useContext(Contesto)
-    const navigate = useNavigate()
-
-    const [isAdmin, setIsAdmin] = React.useState(false);
-
-    const handleLogout=() => {
+    const handleLogout = () => {
         elimina_contesto();
-        navigate("/login")
+        navigate("/login");
     };
-
-React.useEffect(() => {
-    const handleAdmin = async () => {
-        // senza questo if parte anche con token null
-        if (!token) {
-            setIsAdmin(false);
-            return;
-        }
-
-        try {
-            const utente = await axios.get("/api/profile", {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            if (utente && utente.data.user.ruolo === "admin") {
-                setIsAdmin(true);
-            } else {
-                setIsAdmin(false);
-            }
-        } catch (errore) {
-        console.error(errore);
-        }   
-    }
-    handleAdmin();
-}, [token]);
 
     return (
         <nav className="navbar">
             <div className="navbar-gruppo">
-            <Link className="navbar-link" to="/">Home</Link>
-            {isAdmin && (
-                <Link className="navbar-link" to="/modifica-post">Crea Post</Link>
-            )}
+                <Link className="navbar-link" to="/">Home</Link>
+                {isAdmin && (
+                    <Link className="navbar-link" to="/modifica-post">Crea Post</Link>
+                )}
             </div>
             <div>
-                <Link className="navbar-titolo">REFILM</Link>
+                <Link className="navbar-titolo" to="/">REFILM</Link>
             </div>
             <div>
                 {token ? (
                     <>
                         <Link className="navbar-link" to="/profile">Profilo</Link>
-                        <button className="bottone-navbar" onClick={handleLogout} >Logout</button>
+                        <button type="button" className="bottone-navbar" onClick={handleLogout}>
+                            Logout
+                        </button>
                     </>
-
-                ):(
+                ) : (
                     <>
                         <Link className="navbar-link" to="/login">Login</Link>
                         <Link className="navbar-link" to="/registrazione">Registrati</Link>
@@ -68,4 +38,5 @@ React.useEffect(() => {
                 )}
             </div>
         </nav>
-    )}
+    );
+}

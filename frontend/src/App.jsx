@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Esporta_contesto } from './contesto/AuthContext'
 import Navbar from './componenti/Navbar'
@@ -14,18 +13,7 @@ import { ElencoRichieste } from './pagine/ElencoRichieste'
 import './App.css'
 
 function App() {
-
-  const response = axios.get('/api/hello')
-    .then((response) => {
-      console.log(response.data)
-    })
-    .catch((error) => {
-      console.error(error)
-    })
-  
-
   return (
-
     <Esporta_contesto>
       <Router>
         <Navbar />
@@ -35,17 +23,22 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/registrazione" element={<Registrazione />} />
           <Route path="/post/:id" element={<VisualizzaPost />} />
-          <Route element={<ProtezioneRotte/>}>
+
+          <Route element={<ProtezioneRotte />}>
+            <Route path="/profile" element={<Profilo />} />
+          </Route>
+
+          <Route element={<ProtezioneRotte ruoloRichiesto="admin" />}>
             <Route path="/modifica-post" element={<ModificaPost />} />
             <Route path="/modifica-post/:id" element={<ModificaPost />} />
-            <Route path="/profile" element={<Profilo/>}/>
-            <Route path="/ElencoRichieste" element={<ElencoRichieste/>}/>
+            <Route path="/ElencoRichieste" element={<ElencoRichieste />} />
           </Route>
         </Routes>
 
-        <Footer/>
-      </Router>   
+        <Footer />
+      </Router>
     </Esporta_contesto>
   )
 }
+
 export default App

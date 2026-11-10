@@ -1,9 +1,11 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
+import { CATEGORIE_FILM } from "../config/costanti.js";
 
 const SchemaPost = new mongoose.Schema({
     titolo: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     corpo: {
         type: String,
@@ -14,15 +16,15 @@ const SchemaPost = new mongoose.Schema({
 
     //implementare poi degli array per registri e cast
     registi: {
-        type : String,
+        type: String,
         default: ""
     },
     cast: {
-        type : String,
-        default: ""    
+        type: String,
+        default: ""
     },
     riassunto: {
-        type : String,
+        type: String,
         default: ""
     },
     autore: {
@@ -37,16 +39,18 @@ const SchemaPost = new mongoose.Schema({
     voto: {
         type: Number,
         default: 0,
+        min: 0,
+        max: 10
     },
     categorie: [{
         type: String,
-        enum: ['azione', 'commedia', 'drammatico', 'fantascienza', 'horror', 'romantico', 'thriller', 'animazione', 'documentario', 'avventura', 'fantasy', 'storico','grottesco'],
+        enum: CATEGORIE_FILM,
         required: true
     }],
     cover: {
         type: String,
         default: ""
     }
-})
+});
 
-export const Post = mongoose.model('Post', SchemaPost)
+export const Post = mongoose.model('Post', SchemaPost);

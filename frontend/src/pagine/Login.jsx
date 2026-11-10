@@ -1,52 +1,44 @@
-import React from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Contesto } from '../contesto/AuthContext.jsx'
+import { useAuth } from '../contesto/AuthContext.jsx';
+import { loginUser } from '../api/auth';
 import './Login.css';
 
 export default function Login() {
-
-    const [email, setEmail] = React.useState("");
-    const [password, setPassword] = React.useState("");
-    const [errore, setErrore] = React.useState(null);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [errore, setErrore] = useState(null);
 
     const navigate = useNavigate();
-    const {crea_contesto} = React.useContext(Contesto)
+    const { crea_contesto } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setErrore(null);
 
         try {
-            const risposta = await axios.post("/api/login", {
-                email,
-                password
-            });
-
-            console.log(risposta.data.message);
-            crea_contesto(risposta.data.token);
-
+            const risposta = await loginUser(email, password);
+            crea_contesto(risposta.token, risposta.user);
             navigate("/");
-        } catch (errore) {
-            console.error(errore);
-            setErrore("Email o password errati");
+        } catch (err) {
+            console.error(err);
+            setErrore(err.response?.data?.message || "Email o password errati");
         }
     };
 
     return (
-
         <div className="login-container">
             <h1 className="titolo-form">Login</h1>
 
             <form className="form-login" onSubmit={handleSubmit}>
-
                 <div className="login-gruppo">
                     <input
                         className="login-input"
                         type="email"
                         placeholder=" "
                         id="email"
-                        value = {email}
-                        onChange={e => setEmail(e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                     />
                     <label htmlFor="email" className="login-label">
@@ -60,8 +52,8 @@ export default function Login() {
                         type="password"
                         placeholder=" "
                         id="password"
-                        value = {password}
-                        onChange={e => setPassword(e.target.value)}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                     />
                     <label htmlFor="password" className="login-label">
@@ -73,4 +65,5 @@ export default function Login() {
             </form>
             {errore && <p className="messaggio-errore">{errore}</p>}
         </div>
-    )}
+    );
+}

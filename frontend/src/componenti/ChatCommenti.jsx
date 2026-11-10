@@ -1,160 +1,153 @@
-import React from "react";
-import axios from "axios";
+import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
-import { Contesto } from "../contesto/AuthContext.jsx"
-import { useEffect } from "react";
-import "./ChatCommenti.css"
+import { useAuth } from "../contesto/AuthContext.jsx";
+import { fetchCommentsByPost, createComment, deleteComment } from "../api/comments";
+import { API_BASE_URL } from "../utility/costanti";
+import "./ChatCommenti.css";
 
-const url_backend = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
-const socketCommenti = io(url_backend)
+export function ChatCommenti({ postId }) {
+    const [commenti, setCommenti] = useState([]);
+    const [inserito, setInserito] = useState("");
+    const [errore, setErrore] = useState(null);
 
-export function ChatCommenti({postId}) {
+    const { token, isAdmin } = useAuth();
 
-    const [commenti, setCommenti]=React.useState([])
-    const [inserito, setInserito]=React.useState("")
-    const [isAdmin, setIsAdmin] = React.useState(false)
+    useEffect(() => {
+        if (!postId) return;
 
-    const { token }=React.useContext(Contesto)
+        let attivo = true;
+        const caricaCommenti = async () => {
+            try {
+                const lista = await fetchCommentsByPost(postId);
+                if (attivo) {
+                    setCommenti(lista);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        caricaCommenti();
 
-useEffect(() => {
-    const caricaCommenti = async () => {
-        try {
-            const precedenti = await axios.get(`/api/commento/${postId}`)
-            setCommenti(precedenti.data.commenti || [])
-        } catch(errore){
-            console.error(errore)
-        }
-    }
-    caricaCommenti()
+        const socket = io(API_BASE_URL);
+        socket.emit("ingresso_pagina", postId);
 
-    socketCommenti.emit("ingresso_pagina", postId)
+        const handleNuovoCommento = (nuovoCommento) => {
+            setCommenti((prev) => {
+                if (prev.some((c) => c._id === nuovoCommento._id)) {
+                    return prev;
+                }
+                return [...prev, nuovoCommento];
+            });
+        };
 
-    socketCommenti.on("ricevi_commento", (nuovoCommento) => {
-        setCommenti((prev) => [...prev, nuovoCommento])
-    })
-    socketCommenti.on("elimina_commento", (eliminato) => {
-      setCommenti((prev) => prev.filter((c) => c._id !== eliminato))
-    })
+        const handleEliminaCommento = (eliminato) => {
+            const idEliminato = typeof eliminato === "object" ? eliminato?._id : eliminato;
+            setCommenti((prev) => prev.filter((c) => c._id !== idEliminato));
+        };
 
-    return () => {
-        socketCommenti.emit("uscita_pagina", postId)
-        socketCommenti.off("ricevi_commento")
-        socketCommenti.off("elimina_commento")
-        socketCommenti.disconnect()
-    }
-    }, [postId])
+        socket.on("ricevi_commento", handleNuovoCommento);
+        socket.on("elimina_commento", handleEliminaCommento);
 
-
-    const handleChange = (e) => {
-        setInserito(e.target.value)
-    }
+        return () => {
+            attivo = false;
+            socket.emit("uscita_pagina", postId);
+            socket.off("ricevi_commento", handleNuovoCommento);
+            socket.off("elimina_commento", handleEliminaCommento);
+            socket.disconnect();
+        };
+    }, [postId]);
 
     const inviaCommenti = async (e) => {
         e.preventDefault();
+        setErrore(null);
+
+        if (!inserito.trim()) return;
+
         try {
-            const inviato= await axios.post("/api/commento", {contenuto: inserito, postId: postId}, {
-                headers: {
-                    Authorization: `Bearer ${token}`
+            const commentoPostato = await createComment({
+                contenuto: inserito.trim(),
+                postId,
+            });
+            setInserito("");
+            setCommenti((prev) => {
+                if (prev.some((c) => c._id === commentoPostato._id)) {
+                    return prev;
                 }
-            })
-            setInserito("")
-            setCommenti((prev) => [...prev, inviato.data.commentoPostato])
-        } catch(errore) {
-            console.error(errore)
+                return [...prev, commentoPostato];
+            });
+        } catch (err) {
+            console.error(err);
+            setErrore(err.response?.data?.message || "Errore nell'invio del commento.");
         }
-    }
+    };
 
     const eliminaCommenti = async (id) => {
-
-      try {
-        await axios.delete(`/api/commento/${id}`,
-          {headers: {Authorization: `Bearer ${token}`}}
-        )
-        setCommenti((prev) => prev.filter((c) => c._id !== id))
-      } catch(errore) {
-        console.error(errore)
-      }
-    } 
-
-   
-React.useEffect(() => {
-    const handleAdmin = async () => {
-        // senza questo if parte anche con token null
-        if (!token) {
-            setIsAdmin(false);
-            return;
-        }
-
         try {
-            const utente = await axios.get("/api/profile", {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            if (utente && utente.data.user.ruolo === "admin") {
-                setIsAdmin(true);
-            } else {
-                setIsAdmin(false);
-            }
-        } catch (errore) {
-        console.error(errore);
-        }   
-    }
-    handleAdmin();
-}, [token]);
+            await deleteComment(id);
+            setCommenti((prev) => prev.filter((c) => c._id !== id));
+        } catch (err) {
+            console.error(err);
+            setErrore("Impossibile eliminare il commento.");
+        }
+    };
 
+    return (
+        <div className="commenti-container">
+            <h3 className="chat-titolo">Commenti</h3>
 
-return (
-
-    <div className="commenti-container">
-      <h3 className="chat-titolo">Commenti</h3>
-
-      <div className="commenti-lista">
-        { commenti.map((commento) => (
-            <div key={commento._id} className="singolo-commento">
-              <div className="commento-header">
-                <span className="commento-autore">{commento.autore?.nome || "Utente"}</span>
-                <span className="commento-dati">
-                  {new Date(commento.dataCreazione).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {isAdmin && <button
-                className="elimina-commenti"
-                type="button"
-                onClick={() => eliminaCommenti(commento._id)}
-                >
-                  X
-                </button>}
-              </div>
-              <p className="commento-testo">{commento.contenuto}</p>
+            <div className="commenti-lista">
+                {commenti.map((commento) => (
+                    <div key={commento._id} className="singolo-commento">
+                        <div className="commento-header">
+                            <span className="commento-autore">
+                                {commento.autore?.nome || "Utente"}
+                            </span>
+                            <span className="commento-dati">
+                                {new Date(commento.dataCreazione).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })}
+                            </span>
+                            {isAdmin && (
+                                <button
+                                    className="elimina-commenti"
+                                    type="button"
+                                    aria-label="Elimina commento"
+                                    onClick={() => eliminaCommenti(commento._id)}
+                                >
+                                    X
+                                </button>
+                            )}
+                        </div>
+                        <p className="commento-testo">{commento.contenuto}</p>
+                    </div>
+                ))}
             </div>
-          )
-        )}
-      </div>
 
-      {token ? (
-        <form onSubmit={inviaCommenti} className="chat-form">
-          <div className="commenti-input">
-            <textarea
-              type="text"
-              placeholder="Scrivi la tua opinione"
-              value={inserito}
-              rows={1}
-              onChange={handleChange}
-              className="input-inserito"
-            />
-            <button 
-              type="submit" 
-              className="bottone-commenti"
-            >
-              INVIA
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="avviso-login">
-          <p>Effettua l'accesso per commentare</p>
+            {errore && <p className="messaggio-errore">{errore}</p>}
+
+            {token ? (
+                <form onSubmit={inviaCommenti} className="chat-form">
+                    <div className="commenti-input">
+                        <textarea
+                            placeholder="Scrivi la tua opinione"
+                            value={inserito}
+                            rows={1}
+                            maxLength={400}
+                            onChange={(e) => setInserito(e.target.value)}
+                            className="input-inserito"
+                            required
+                        />
+                        <button type="submit" className="bottone-commenti">
+                            INVIA
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <div className="avviso-login">
+                    <p>Effettua l'accesso per commentare</p>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 }

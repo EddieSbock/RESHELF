@@ -1,19 +1,12 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
-import { Contesto } from '../contesto/AuthContext';
+import { fetchPostById, createPost, updatePost } from '../api/posts';
+import { CATEGORIE_FILM } from '../utility/costanti';
 import './ModificaPost.css';
 
-const categorie_presenti = ['azione', 'commedia', 'drammatico', 
-        'fantascienza', 'horror', 'romantico', 'thriller', 'animazione', 
-        'documentario', 'avventura', 'fantasy', 'storico','grottesco']
-
 export default function GestionePost() {
-
   const { id } = useParams();
   const navigate = useNavigate();
-
-  const { token } = useContext(Contesto);
 
   const [form, setForm] = useState({
     titolo: "",
@@ -27,70 +20,88 @@ export default function GestionePost() {
   });
 
   const [errore, setErrore] = useState(null);
+  const [invioInCorso, setInvioInCorso] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const recuperaPost = async () => {
-        try {
-          const post = await axios.get(`/api/post/${id}`);
-          const p = post.data.post;
+    if (!id) return;
+
+    let attivo = true;
+    const recuperaPost = async () => {
+      try {
+        const p = await fetchPostById(id);
+        if (attivo && p) {
           setForm({
-            titolo: p.titolo,
-            riassunto: p.riassunto,
-            corpo: p.corpo,
-            cover: p.cover,
-            registi: p.registi,
-            cast: p.cast,
-            voto: p.voto,
-            categorie: p.categorie
+            titolo: p.titolo || "",
+            riassunto: p.riassunto || "",
+            corpo: p.corpo || "",
+            cover: p.cover || "",
+            registi: p.registi || "",
+            cast: p.cast || "",
+            voto: p.voto ?? 10,
+            categorie: p.categorie || []
           });
-        } catch (errore) {
+        }
+      } catch (err) {
+        console.error(err);
+        if (attivo) {
           setErrore("Impossibile caricare i dati del post da modificare.");
         }
-      };
-      recuperaPost();
-    }
+      }
+    };
+    recuperaPost();
+    return () => {
+      attivo = false;
+    };
   }, [id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(({...form, [name]: value}));
+    setForm((prev) => ({
+      ...prev,
+      [name]: name === "voto" ? Number(value) : value
+    }));
   };
 
   const handleCheckbox = (scelta) => {
-    setForm(prev => {
+    setForm((prev) => {
       const esiste = prev.categorie.includes(scelta);
       return {
         ...prev,
-        categorie: esiste ? prev.categorie.filter(c => c !== scelta) : [...prev.categorie, scelta]
+        categorie: esiste
+          ? prev.categorie.filter((c) => c !== scelta)
+          : [...prev.categorie, scelta]
       };
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrore(null);
 
+    if (form.categorie.length === 0) {
+      setErrore("Seleziona almeno una categoria.");
+      return;
+    }
+
+    if (form.corpo.trim().length < 10) {
+      setErrore("Il corpo della recensione deve contenere almeno 10 caratteri.");
+      return;
+    }
+
+    setInvioInCorso(true);
     try {
-
       if (id) {
-        await axios.patch(`/api/post/${id}`, form, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        await updatePost(id, form);
         navigate(`/post/${id}`);
       } else {
-        
-        const creato = await axios.post("/api/post", form, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        navigate(`/post/${creato.data.post._id}`);
+        const creato = await createPost(form);
+        navigate(`/post/${creato._id}`);
       }
-    } catch (errore) {
-      console.error(errore);
-      setErrore("Errore durante il salvataggio.");
+    } catch (err) {
+      console.error(err);
+      setErrore(err.response?.data?.message || "Errore durante il salvataggio.");
+    } finally {
+      setInvioInCorso(false);
     }
   };
 
@@ -106,36 +117,38 @@ export default function GestionePost() {
 
         <form onSubmit={handleSubmit} className="modifica-form">
           <div className="form-input">
-            <label>titolo del film</label>
-            <input 
-                className="input-item"
-                type="text" 
-                name="titolo"
-                value={form.titolo}
-                onChange={handleChange}
-                required
-                placeholder="es. Kill Bill volume 1"
+            <label htmlFor="post-titolo">titolo del film</label>
+            <input
+              id="post-titolo"
+              className="input-item"
+              type="text"
+              name="titolo"
+              value={form.titolo}
+              onChange={handleChange}
+              required
+              placeholder="es. Kill Bill volume 1"
             />
           </div>
 
           <div className="form-input">
-            <label>URL Immagine di Copertina</label>
-            <input 
-                className="input-item"
-                type="url" 
-                name="cover"
-                value={form.cover}
-                onChange={handleChange}
-              
-                placeholder="https://..."
+            <label htmlFor="post-cover">URL Immagine di Copertina</label>
+            <input
+              id="post-cover"
+              className="input-item"
+              type="url"
+              name="cover"
+              value={form.cover}
+              onChange={handleChange}
+              placeholder="https://..."
             />
           </div>
 
           <div className="form-riga-doppia">
             <div className="form-input">
-              <label>Regia</label>
-              <input 
-                type="text" 
+              <label htmlFor="post-registi">Regia</label>
+              <input
+                id="post-registi"
+                type="text"
                 className="input-item"
                 name="registi"
                 value={form.registi}
@@ -145,8 +158,9 @@ export default function GestionePost() {
             </div>
 
             <div className="form-input">
-              <label>Voto (1-10)</label>
-              <input 
+              <label htmlFor="post-voto">Voto (1-10)</label>
+              <input
+                id="post-voto"
                 type="number"
                 className="input-item"
                 name="voto"
@@ -159,9 +173,10 @@ export default function GestionePost() {
           </div>
 
           <div className="form-input">
-            <label>Cast Principale</label>
-            <input 
-              type="text" 
+            <label htmlFor="post-cast">Cast Principale</label>
+            <input
+              id="post-cast"
+              type="text"
               name="cast"
               value={form.cast}
               onChange={handleChange}
@@ -173,9 +188,9 @@ export default function GestionePost() {
           <div className="form-input">
             <label>Categorie</label>
             <div className="categorie-griglia">
-              {categorie_presenti.map(categoria => (
+              {CATEGORIE_FILM.map((categoria) => (
                 <label key={categoria} className="categoria-checkbox">
-                  <input 
+                  <input
                     type="checkbox"
                     checked={form.categorie.includes(categoria)}
                     onChange={() => handleCheckbox(categoria)}
@@ -187,9 +202,10 @@ export default function GestionePost() {
           </div>
 
           <div className="form-input">
-            <label>Descrizione</label>
-            <input 
-              type="text" 
+            <label htmlFor="post-riassunto">Descrizione</label>
+            <input
+              id="post-riassunto"
+              type="text"
               name="riassunto"
               value={form.riassunto}
               onChange={handleChange}
@@ -199,10 +215,13 @@ export default function GestionePost() {
           </div>
 
           <div className="form-input">
-            <label>Corpo del Post</label>
-            <textarea 
+            <label htmlFor="post-corpo">Corpo del Post</label>
+            <textarea
+              id="post-corpo"
               name="corpo"
               rows="8"
+              minLength={10}
+              maxLength={5000}
               value={form.corpo}
               onChange={handleChange}
               required
@@ -211,8 +230,9 @@ export default function GestionePost() {
             ></textarea>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
+            disabled={invioInCorso}
             className="form-bottone form-bottone-invio"
           >
             {id ? "aggiorna articolo" : "pubblica articolo"}

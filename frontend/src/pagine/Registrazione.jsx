@@ -1,32 +1,38 @@
-import React from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import './Registrazione.css'
-
+import { registerUser } from '../api/auth';
+import './Registrazione.css';
 
 export default function Registrazione() {
-
-    const [nome, setNome] = React.useState("");
-    const [email, setEmail] = React.useState("");
-    const [password, setPassword] = React.useState("");
-    const [errore, setErrore] = React.useState(null);
+    const [nome, setNome] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [errore, setErrore] = useState(null);
 
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
-            e.preventDefault();
+        e.preventDefault();
+        setErrore(null);
+
+        if (!nome.trim() || !email.trim() || !password) {
+            setErrore("Compila tutti i campi obbligatori");
+            return;
+        }
 
         try {
-            const risposta = await axios.post("/api/register", {
-                nome,
-                email,
-                password
+            await registerUser({
+                nome: nome.trim(),
+                email: email.trim(),
+                password,
             });
-            
-            console.log(risposta.data);
             navigate("/login");
         } catch (error) {
-            setErrore(error);
+            const msg =
+                error.response?.data?.message ||
+                (typeof error.response?.data === "string" ? error.response.data : null) ||
+                "Errore durante la registrazione. Riprova.";
+            setErrore(msg);
         }
     };
 
@@ -36,43 +42,44 @@ export default function Registrazione() {
 
             <form className="form-registrazione" onSubmit={handleSubmit}>
                 <div className="registrazione-gruppo">
-                    <input 
+                    <input
                         className="registrazione-input"
                         type="text"
                         placeholder=" "
                         id="nome"
-                        value = {nome}
-                        onChange={e => setNome(e.target.value)}
+                        value={nome}
+                        onChange={(e) => setNome(e.target.value)}
+                        required
                     />
                     <label htmlFor="nome" className="registrazione-label">
                         Nome Utente
                     </label>
                 </div>
 
-                <div className="registrazione-gruppo">                   
-                    
+                <div className="registrazione-gruppo">
                     <input
                         className="registrazione-input"
                         type="email"
                         placeholder=" "
                         id="email"
-                        value = {email}
-                        onChange={e => setEmail(e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
                     />
                     <label htmlFor="email" className="registrazione-label">
                         Email
                     </label>
                 </div>
 
-                <div className="registrazione-gruppo">   
-                    
+                <div className="registrazione-gruppo">
                     <input
                         className="registrazione-input"
                         type="password"
                         placeholder=" "
                         id="password"
-                        value = {password}
-                        onChange={e => setPassword(e.target.value)}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
                     />
                     <label htmlFor="password" className="registrazione-label">
                         Password
@@ -83,6 +90,5 @@ export default function Registrazione() {
             </form>
             {errore && <p className="messaggio-errore">{errore}</p>}
         </div>
-
-    )
+    );
 }

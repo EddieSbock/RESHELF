@@ -1,16 +1,20 @@
 import mongoose from "mongoose";
 
 const SchemaRichiesta = new mongoose.Schema({
-
     user: {
-        type: mongoose.Schema.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true
     },
     motivo: {
         type: String,
-        default: ""
+        default: "",
+        trim: true
+    },
+    dataCreazione: {
+        type: Date,
+        default: Date.now
     }
-})
+});
 
-export const Richieste = mongoose.model('Richieste', SchemaRichiesta)
+export const Richieste = mongoose.model('Richieste', SchemaRichiesta);

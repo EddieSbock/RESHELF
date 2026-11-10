@@ -1,101 +1,87 @@
-import React, { useState , useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Contesto } from "../contesto/AuthContext";
-import axios from "axios";
-import "./Footer.css"
-import kill_bill from "../assets/kill_bill.png"
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../contesto/AuthContext";
+import { createRichiesta } from "../api/requests";
+import "./Footer.css";
+import kill_bill from "../assets/kill_bill.png";
 
 export function Footer() {
+    const { token, user, isAdmin } = useAuth();
+    const [motivo, setMotivo] = useState("");
+    const [feedback, setFeedback] = useState(null);
+    const [errore, setErrore] = useState(null);
 
-    const navigate = useNavigate()
+    const handleForm = async (e) => {
+        e.preventDefault();
+        setFeedback(null);
+        setErrore(null);
 
-    const { token } = React.useContext(Contesto)
-    const [isAdmin, setIsAdmin]= useState(false)
-    const [nome, setNome]=useState("")
-    const [email, setEmail]=useState("")
-    const [motivo, setMotivo]=useState("")
-
-useEffect(() => {
-
-    setMotivo("")
-
-    if(!token) return;
-
-    const handleFooter = async () => {
-        try {
-            const utente = await axios.get("/api/profile", {
-                headers: {Authorization: `Bearer ${token}`}
-            })
-            setNome(utente.data.user.nome);
-            setEmail(utente.data.user.email);
-            if (utente && utente.data.user.ruolo === "admin") {
-                setIsAdmin(true);
-            } else {
-                setIsAdmin(false);
-            }
-        } catch(errore) {
-            console.error(errore)
+        if (!motivo.trim()) {
+            setErrore("Inserisci una motivazione valida.");
+            return;
         }
-    }
-    handleFooter()
-    
-}, [token])
 
-const handleForm = async (e) => {
-    e.preventDefault()
         try {
-            await axios.post("/api/richieste", {motivo}, {
-                headers: {Authorization: `Bearer ${token}`}
-            })
-            setMotivo("")
-            navigate("/")
-        } catch(errore) {
-            console.error(errore)
+            const res = await createRichiesta(motivo.trim());
+            setMotivo("");
+            setFeedback(res.message || "Richiesta inviata con successo!");
+        } catch (err) {
+            console.error(err);
+            setErrore(err.response?.data?.message || "Errore nell'invio della richiesta.");
         }
-    }
+    };
 
-return(
-    <footer className="footer-container">
-        <div className="footer-gruppo">
-            <img className="footer-img" src= {kill_bill} />
-            {token && (<div className="sezione-autore">
-                {isAdmin ? (<Link className="bottone-richieste" to="/ElencoRichieste">Richieste</Link>
-                ):(
-                <div>
-                    <h4>Entra a far parte dello staff</h4>
-                        <form className="form-autore" onSubmit={handleForm}>
-                            <input 
-                            type="nome"
-                            id="Nome"
-                            placeholder="Nome"
-                            value={nome}
-                            readOnly
-                            />
-                            <input 
-                            type="email"
-                            id="Email"
-                            placeholder="Email"
-                            value={email}
-                            readOnly
-                            />
-                            <textarea
-                            className="autore-motivo"
-                            type="text"
-                            placeholder="Perchè vorresti lavorare con noi..."
-                            value={motivo}
-                            onChange={(e) => setMotivo(e.target.value)}
-                            required
-                            />
-                            <button type="submit" className="footer-bottone">Invia</button>
-                        </form>
-                </div>
+    return (
+        <footer className="footer-container">
+            <div className="footer-gruppo">
+                <img className="footer-img" src={kill_bill} alt="Kill Bill" />
+                {token && (
+                    <div className="sezione-autore">
+                        {isAdmin ? (
+                            <Link className="bottone-richieste" to="/ElencoRichieste">
+                                Richieste
+                            </Link>
+                        ) : (
+                            <div>
+                                <h4>Entra a far parte dello staff</h4>
+                                <form className="form-autore" onSubmit={handleForm}>
+                                    <input
+                                        type="text"
+                                        id="footer-nome"
+                                        placeholder="Nome"
+                                        value={user?.nome || ""}
+                                        readOnly
+                                    />
+                                    <input
+                                        type="email"
+                                        id="footer-email"
+                                        placeholder="Email"
+                                        value={user?.email || ""}
+                                        readOnly
+                                    />
+                                    <textarea
+                                        className="autore-motivo"
+                                        id="footer-motivo"
+                                        placeholder="Perchè vorresti lavorare con noi..."
+                                        value={motivo}
+                                        onChange={(e) => setMotivo(e.target.value)}
+                                        required
+                                    />
+                                    {feedback && <p className="messaggio-successo">{feedback}</p>}
+                                    {errore && <p className="messaggio-errore">{errore}</p>}
+                                    <button type="submit" className="footer-bottone">
+                                        Invia
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+                    </div>
                 )}
-            </div>)}
-            
-            <div className="Social">
-                    <h4>Seguici anche qui</h4>
 
+                <div className="Social">
+                    <h4>Seguici anche qui</h4>
+                </div>
             </div>
-        </div>
-    </footer>
-)}
+        </footer>
+    );
+}
